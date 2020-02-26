@@ -3,6 +3,13 @@
 
 Authors: [Hanchung Lee](https://github.com/leehanchung), [Hursh Desai](https://github.com/hurshd0)
 
+## Data
+A total of 876 training images were provided by CGIAR.
+`healthy_wheat`: 142
+`leaf_rust`: 358
+`stem_rust`: 376
+
+
 ## Evaluation Metric
 The evaluation metric for this challenge is Log Loss.
 
