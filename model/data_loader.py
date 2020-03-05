@@ -1,18 +1,22 @@
+import os
+from pathlib import Path
 import numpy as np
 import tensorflow as tf
 
 
 class DataLoader:
     
-    def __init__(self, filepath:str, augment:bool=False):
-        self.filepath = filepath
+    def __init__(self, filepath:str, train_test_split:float=0.95, augment:bool=False):
+        # self.batch_size = batch_size   bath_size:int=32, 
+        self.height, self.width, self.channel = 224, 224, 3
+        self.batch_size = 32
+        CLASS_NAMES = np.array([item.name for item in Path(filepath + "/train").glob('*')])
         self.dataset = self.__load(filepath)
+        self.train_test_split = train_test_split
+        self.augment = augment
+        self.filepath = filepath
     
-    def __load(self, fliepath:str) -> tf.data.Dataset:
-
-        pass
-    
-    def augment(self):
+    def augment_data(self):
         """
         Applying augmentation to dataset
         """
@@ -23,8 +27,37 @@ class DataLoader:
 
         self.dataset = self.dataset.map(lambda x: tf.clip_by_value(x, 0, 1))
         pass
+    
+    def __load(self, filepath:str):
+        self.dataset_size = len(list(Path(filepath + "/train").glob('*/*')))
+        self.CLASS_NAMES = np.array([item.name for item in Path(filepath + "/train").glob('*')])
 
-    def __rotate(self, x:tf.Tensor) -> tf.Tensor:
+        img_files = tf.data.Dataset.list_files(str(filepath + "/train/" +'*/*'))
+        print(self.dataset_size)
+        print(self.CLASS_NAMES, self.CLASS_NAMES.shape)
+        print(next(iter(img_files)))
+        # print 5 files
+        # for f in img_files.take(5):
+        #     print(f.numpy())
+
+        process_files_fn = lambda x: self.__process_path(x)
+        dataset = img_files.map(process_files_fn, num_parallel_calls=24).batch(self.batch_size)
+        return dataset
+
+    def __process_path(self, filename:str) -> [tf.Tensor, str]:
+        img_loader = tf.io.read_file(filename)
+        img_decoder = tf.image.decode_jpeg(img_loader, channels=self.channel)
+        img = tf.image.convert_image_dtype(img_decoder, tf.float32)
+        img = tf.image.resize(img, [self.width, self.height])
+
+        parts = tf.strings.split(filename, os.path.sep)
+        print(parts[-2])
+        label = parts[-2] == self.CLASS_NAMES
+
+        return img, label
+    
+    @staticmethod
+    def __rotate(x:tf.Tensor) -> tf.Tensor:
         """
         Rotation augmentation
         
@@ -33,8 +66,9 @@ class DataLoader:
         """
         # rotate 0, 90, 180, 270 degrees
         return tf.image.rot90(x, tf.random_uniform(shape=[], minval=0, max_val=4, dtype=tf.int32))
-
-    def __flip(self, x:tf.Tensor) -> tf.Tensor:
+    
+    @staticmethod
+    def __flip(x:tf.Tensor) -> tf.Tensor:
         """
         Flip augmentation
         
@@ -46,7 +80,8 @@ class DataLoader:
 
         return x
 
-    def __color(self, x:tf.Tensor) -> tf.Tensor:
+    @staticmethod
+    def __color(x:tf.Tensor) -> tf.Tensor:
         """
         Color augmentation
         
@@ -57,10 +92,14 @@ class DataLoader:
         x = tf.image.random_saturation(x, 0.6, 1.6)
         x = tf.image.random_brightness(x, 0.05)
         x = tf.image.random_contrast(x, 0.7, 1.3)
+    
+        # Make sure the image is still in [0, 1]
+        x = tf.clip_by_value(x, 0.0, 1.0)
 
         return x
 
-    def __zoom(self, x:tf.Tensor) -> tf.Tensor:
+    @staticmethod
+    def __zoom(x:tf.Tensor) -> tf.Tensor:
         """
         Zoom augmentation
         
@@ -82,9 +121,8 @@ class DataLoader:
 
         choice = tf.random_uniform(shape=[], minval=0., maxval=1., dtype=tf.float32)
 
-        return tf.cond(choice < 0.5, lambda x, lambda: random_crop(x))
+        return tf.cond(choice < 0.5, lambda: x, lambda: random_crop(x))
 
-    
 
 
 def _parse_function(filename, label, size):
@@ -104,25 +142,6 @@ def _parse_function(filename, label, size):
     resized_image = tf.image.resize_images(image, [size, size])
 
     return resized_image, label
-
-
-def train_preprocess(image, label, use_random_flip):
-    """Image preprocessing for training.
-    Apply the following operations:
-        - Horizontally flip the image with probability 1/2
-        - Apply random brightness and saturation
-    """
-    if use_random_flip:
-        image = tf.image.random_flip_left_right(image)
-
-    image = tf.image.random_brightness(image, max_delta=32.0 / 255.0)
-    image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
-
-    # Make sure the image is still in [0, 1]
-    image = tf.clip_by_value(image, 0.0, 1.0)
-
-    return image, label
-
 
 def input_fn(is_training, filenames, labels, params):
     """Input function for the SIGNS dataset.
