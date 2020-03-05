@@ -1,11 +1,15 @@
+<<<<<<< HEAD
 import os
 from pathlib import Path
+=======
+>>>>>>> 45ba05d822bd9bfd3cb60b74d25ae810d766c289
 import numpy as np
 import tensorflow as tf
 
 
 class DataLoader:
     
+<<<<<<< HEAD
     def __init__(self, filepath:str, train_test_split:float=0.95, augment:bool=False):
         # self.batch_size = batch_size   bath_size:int=32, 
         self.height, self.width, self.channel = 224, 224, 3
@@ -17,6 +21,17 @@ class DataLoader:
         self.filepath = filepath
     
     def augment_data(self):
+=======
+    def __init__(self, filepath:str, augment:bool=False):
+        self.filepath = filepath
+        self.dataset = self.__load(filepath)
+    
+    def __load(self, fliepath:str) -> tf.data.Dataset:
+
+        pass
+    
+    def augment(self):
+>>>>>>> 45ba05d822bd9bfd3cb60b74d25ae810d766c289
         """
         Applying augmentation to dataset
         """
@@ -27,6 +42,7 @@ class DataLoader:
 
         self.dataset = self.dataset.map(lambda x: tf.clip_by_value(x, 0, 1))
         pass
+<<<<<<< HEAD
     
     def __load(self, filepath:str):
         self.dataset_size = len(list(Path(filepath + "/train").glob('*/*')))
@@ -58,6 +74,10 @@ class DataLoader:
     
     @staticmethod
     def __rotate(x:tf.Tensor) -> tf.Tensor:
+=======
+
+    def __rotate(self, x:tf.Tensor) -> tf.Tensor:
+>>>>>>> 45ba05d822bd9bfd3cb60b74d25ae810d766c289
         """
         Rotation augmentation
         
@@ -66,9 +86,14 @@ class DataLoader:
         """
         # rotate 0, 90, 180, 270 degrees
         return tf.image.rot90(x, tf.random_uniform(shape=[], minval=0, max_val=4, dtype=tf.int32))
+<<<<<<< HEAD
     
     @staticmethod
     def __flip(x:tf.Tensor) -> tf.Tensor:
+=======
+
+    def __flip(self, x:tf.Tensor) -> tf.Tensor:
+>>>>>>> 45ba05d822bd9bfd3cb60b74d25ae810d766c289
         """
         Flip augmentation
         
@@ -80,8 +105,12 @@ class DataLoader:
 
         return x
 
+<<<<<<< HEAD
     @staticmethod
     def __color(x:tf.Tensor) -> tf.Tensor:
+=======
+    def __color(self, x:tf.Tensor) -> tf.Tensor:
+>>>>>>> 45ba05d822bd9bfd3cb60b74d25ae810d766c289
         """
         Color augmentation
         
@@ -92,6 +121,7 @@ class DataLoader:
         x = tf.image.random_saturation(x, 0.6, 1.6)
         x = tf.image.random_brightness(x, 0.05)
         x = tf.image.random_contrast(x, 0.7, 1.3)
+<<<<<<< HEAD
     
         # Make sure the image is still in [0, 1]
         x = tf.clip_by_value(x, 0.0, 1.0)
@@ -100,6 +130,12 @@ class DataLoader:
 
     @staticmethod
     def __zoom(x:tf.Tensor) -> tf.Tensor:
+=======
+
+        return x
+
+    def __zoom(self, x:tf.Tensor) -> tf.Tensor:
+>>>>>>> 45ba05d822bd9bfd3cb60b74d25ae810d766c289
         """
         Zoom augmentation
         
@@ -121,8 +157,14 @@ class DataLoader:
 
         choice = tf.random_uniform(shape=[], minval=0., maxval=1., dtype=tf.float32)
 
+<<<<<<< HEAD
         return tf.cond(choice < 0.5, lambda: x, lambda: random_crop(x))
 
+=======
+        return tf.cond(choice < 0.5, lambda x, lambda: random_crop(x))
+
+    
+>>>>>>> 45ba05d822bd9bfd3cb60b74d25ae810d766c289
 
 
 def _parse_function(filename, label, size):
@@ -143,6 +185,28 @@ def _parse_function(filename, label, size):
 
     return resized_image, label
 
+<<<<<<< HEAD
+=======
+
+def train_preprocess(image, label, use_random_flip):
+    """Image preprocessing for training.
+    Apply the following operations:
+        - Horizontally flip the image with probability 1/2
+        - Apply random brightness and saturation
+    """
+    if use_random_flip:
+        image = tf.image.random_flip_left_right(image)
+
+    image = tf.image.random_brightness(image, max_delta=32.0 / 255.0)
+    image = tf.image.random_saturation(image, lower=0.5, upper=1.5)
+
+    # Make sure the image is still in [0, 1]
+    image = tf.clip_by_value(image, 0.0, 1.0)
+
+    return image, label
+
+
+>>>>>>> 45ba05d822bd9bfd3cb60b74d25ae810d766c289
 def input_fn(is_training, filenames, labels, params):
     """Input function for the SIGNS dataset.
     The filenames have format "{label}_IMG_{id}.jpg".
