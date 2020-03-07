@@ -4,17 +4,17 @@ import numpy as np
 import tensorflow as tf
 
 
-class DataLoader:
+class Dataset:
     
-    def __init__(self, filepath:str, train_test_split:float=0.95, augment:bool=False):
-        # self.batch_size = batch_size   bath_size:int=32, 
+    def __init__(self, filepath:str, batch_size:int=32, train_test_split:float=0.95, augment:bool=False):
         self.height, self.width, self.channel = 224, 224, 3
-        self.batch_size = 32
-        CLASS_NAMES = np.array([item.name for item in Path(filepath + "/train").glob('*')])
-        self.dataset = self.__load(filepath)
+        self.batch_size = batch_size
         self.train_test_split = train_test_split
         self.augment = augment
-        self.filepath = filepath
+        self.dataset_size = len(list(Path(filepath).glob('*/*')))
+        self.class_names = np.array([item.name for item in Path(filepath).glob('*')])
+        self.train, self.val = self.__load(filepath)
+        self.wights = np.array([item.name for item in Path(filepath).glob('*')])
     
     def augment_data(self):
         """
@@ -28,23 +28,33 @@ class DataLoader:
         self.dataset = self.dataset.map(lambda x: tf.clip_by_value(x, 0, 1))
         pass
     
-    def __load(self, filepath:str):
-        self.dataset_size = len(list(Path(filepath + "/train").glob('*/*')))
-        self.CLASS_NAMES = np.array([item.name for item in Path(filepath + "/train").glob('*')])
-
-        img_files = tf.data.Dataset.list_files(str(filepath + "/train/" +'*/*'))
+    def __load(self, filepath:str):        
+        img_files = tf.data.Dataset.list_files(str(filepath + '*/*')).shuffle(self.dataset_size)
         print(self.dataset_size)
-        print(self.CLASS_NAMES, self.CLASS_NAMES.shape)
-        print(next(iter(img_files)))
+        print(self.class_names, self.class_names.shape)
+        # print(next(iter(img_files)))
         # print 5 files
         # for f in img_files.take(5):
         #     print(f.numpy())
 
+        train_size, val_size = int(self.train_test_split * self.dataset_size), int((1-self.train_test_split) * self.dataset_size)
         process_files_fn = lambda x: self.__process_path(x)
-        dataset = img_files.map(process_files_fn, num_parallel_calls=24).batch(self.batch_size)
-        return dataset
+        dataset = img_files.map(process_files_fn, num_parallel_calls=24)
+
+        train = dataset.take(train_size).batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE).prefetch(2)
+        val = dataset.skip(train_size).batch(self.batch_size).prefetch(tf.data.experimental.AUTOTUNE).prefetch(2)
+        
+        print(f'all: {self.dataset_size}, train: {train_size}, val: {val_size}')
+        # return dataset
+        return train, val
 
     def __process_path(self, filename:str) -> [tf.Tensor, str]:
+        """Obtain the image from the filename (for both training and validation).
+        The following operations are applied:
+        - Decode the image from jpeg format
+        - Convert to float and to range [0, 1]
+        """
+
         img_loader = tf.io.read_file(filename)
         img_decoder = tf.image.decode_jpeg(img_loader, channels=self.channel)
         img = tf.image.convert_image_dtype(img_decoder, tf.float32)
@@ -52,7 +62,7 @@ class DataLoader:
 
         parts = tf.strings.split(filename, os.path.sep)
         print(parts[-2])
-        label = parts[-2] == self.CLASS_NAMES
+        label = tf.cast(parts[-2] == self.class_names, tf.int16)
 
         return img, label
     
@@ -122,26 +132,6 @@ class DataLoader:
         choice = tf.random_uniform(shape=[], minval=0., maxval=1., dtype=tf.float32)
 
         return tf.cond(choice < 0.5, lambda: x, lambda: random_crop(x))
-
-
-
-def _parse_function(filename, label, size):
-    """Obtain the image from the filename (for both training and validation).
-    The following operations are applied:
-        - Decode the image from jpeg format
-        - Convert to float and to range [0, 1]
-    """
-    image_string = tf.read_file(filename)
-
-    # Don't use tf.image.decode_image, or the output shape will be undefined
-    image_decoded = tf.image.decode_jpeg(image_string, channels=3)
-
-    # This will convert to float values in [0, 1]
-    image = tf.image.convert_image_dtype(image_decoded, tf.float32)
-
-    resized_image = tf.image.resize_images(image, [size, size])
-
-    return resized_image, label
 
 def input_fn(is_training, filenames, labels, params):
     """Input function for the SIGNS dataset.

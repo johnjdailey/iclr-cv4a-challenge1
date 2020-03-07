@@ -1,5 +1,8 @@
 .vscode/
 __pycache__/
 *~
+*.hdf5
+notebooks/model/
 data/test/
 data/train/
+submissions/
